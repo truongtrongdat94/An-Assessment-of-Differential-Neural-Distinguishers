@@ -213,3 +213,45 @@ def make_mult_pairs_advantage_data(
         data_format=data_format, redraw_key="pair", combine=combine
     )
     return x, y
+
+def make_train_data_related_key(
+    n_samples, cipher, diff_p, diff_k, calc_back=0, y=None, 
+    additional_conditions=None, data_format=None
+) -> (np.ndarray, np.ndarray):
+    """
+    Generates data for the RELATED-KEY differential scenario
+    
+    :param diff_p: The plaintext difference (ΔP)
+    :param diff_k: The key difference (ΔK)
+    
+    Training pairs:
+        - Y=1: (P, P⊕ΔP) encrypted with (K, K⊕ΔK)
+        - Y=0: (P, P_random) encrypted with (K, K⊕ΔK)  ← KEY DIFFERENCE PRESERVED
+    """
+    # generate labels
+    if y is None:
+        y = np.frombuffer(urandom(n_samples), dtype=np.uint8) & 1
+    elif y == 0 or y == 1:
+        y = np.array([y for _ in range(n_samples)], dtype=np.uint8)
+    
+    # draw keys and plaintexts
+    keys0 = cipher.draw_keys(n_samples)  # ← K
+    keys1 = keys0 ^ np.array(diff_k, dtype=cipher.word_dtype)[:, np.newaxis]  # ← K' = K ⊕ ΔK
+    
+    pt0 = cipher.draw_plaintexts(n_samples)
+    if additional_conditions is not None:
+        pt0 = additional_conditions(pt0)
+    pt1 = pt0 ^ np.array(diff_p, dtype=cipher.word_dtype)[:, np.newaxis]  # ← P' = P ⊕ ΔP
+    
+    # ✅ CHỈ RANDOMIZE PLAINTEXT CHO LABEL=0, KHÔNG ĐỔI KEY
+    num_rand_samples = np.sum(y == 0)
+    pt1[:, y == 0] = cipher.draw_plaintexts(num_rand_samples)  # ← RANDOM P' for wrong pairs
+    # ❌ KHÔNG CÓ: keys1[:, y == 0] = ...  (GIỮ NGUYÊN ΔK)
+    
+    # encrypt with fixed key difference
+    ct0 = cipher.encrypt(pt0, keys0)  # ← C = E_K(P)
+    ct1 = cipher.encrypt(pt1, keys1)  # ← C' = E_{K⊕ΔK}(P' or P_random)
+    
+    # perform backwards calculation and other preprocessing
+    x = preprocess_samples(ct0, ct1, pt0, pt1, cipher, calc_back, data_format)
+    return x, y
