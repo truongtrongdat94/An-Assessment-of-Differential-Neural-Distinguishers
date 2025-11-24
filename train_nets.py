@@ -88,3 +88,62 @@ def train_distinguisher(
     dump(h.history, open(f'{result_base_name}_hist.p', 'wb'))
     print(f'Best validation accuracy: {np.max(h.history["val_acc"])}, model saved as {result_base_name}.h5')
     return net, h
+
+def train_distinguisher_related_key(
+    cipher, diff_p, diff_k, n_train_samples=10**7, n_val_samples=10**6, n_epochs=80, 
+    depth=10, n_neurons=64, kernel_size=3, n_filters=32, reg_param=10**-5, 
+    lr_high=0.002, lr_low=0.0001, cconv=False, calc_back=0
+):
+    """
+    Train a neural distinguisher for RELATED-KEY differential attacks
+    
+    Args:
+        cipher: Cipher object (e.g., Skinny)
+        diff_p: Plaintext difference (ΔP)
+        diff_k: Key difference (ΔK) - NEW for related-key
+        ... (other params same as train_distinguisher)
+    """
+    from make_data import make_train_data_related_key  # Import the new function
+    
+    n_rounds = cipher.get_n_rounds()
+    cipher_name = type(cipher).__name__
+    result_base_name = f'{wdir}{cipher_name}_{n_rounds}_RK_best_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
+    
+    # Create the network
+    net = make_resnet(
+        depth=depth, d1=n_neurons, d2=n_neurons, ks=kernel_size, num_filters=n_filters, 
+        reg_param=reg_param, cconv=cconv, word_size=cipher.get_word_size(), 
+        num_blocks=cipher.get_n_words()
+    )
+    net.compile(optimizer='adam', loss='mse', metrics=['acc'])
+    
+    # Generate RELATED-KEY training and validation data
+    print("Generating related-key training data...")
+    X, Y = make_train_data_related_key(n_train_samples, cipher, diff_p, diff_k, calc_back)
+    
+    print("Generating related-key validation data...")
+    X_eval, Y_eval = make_train_data_related_key(n_val_samples, cipher, diff_p, diff_k, calc_back)
+    
+    # Set up model checkpoint
+    check = make_checkpoint(f'{result_base_name}.h5')
+    
+    # Create learning rate schedule
+    lr = LearningRateScheduler(cyclic_lr(10, lr_high, lr_low))
+    
+    # Train and evaluate
+    print(f"\nTraining related-key distinguisher...")
+    h = net.fit(X, Y, epochs=n_epochs, batch_size=bs, validation_data=(X_eval, Y_eval), 
+                callbacks=[lr, check])
+    
+    # Save results
+    np.save(f'{result_base_name}_h.npy', h.history['val_acc'])
+    np.save(f'{result_base_name}_h.npy', h.history['val_loss'])
+    dump(h.history, open(f'{result_base_name}_hist.p', 'wb'))
+    
+    print(f'\n{"="*80}')
+    print(f'Best validation accuracy: {np.max(h.history["val_acc"]):.6f}')
+    print(f'Model saved as: {result_base_name}.h5')
+    print(f'{"="*80}\n')
+    
+    return net, h
+
