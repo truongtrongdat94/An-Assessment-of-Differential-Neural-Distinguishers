@@ -233,6 +233,9 @@ def make_train_data_related_key(
         dtype=cipher.word_dtype
     ).reshape(cipher.n_main_key_words, n_samples)  # Shape: (16, n_samples)
 
+    if cipher.main_key_word_size < 8:
+    master_keys0 = np.right_shift(master_keys0, 8 - cipher.main_key_word_size)
+
     # Áp dụng key difference
     master_keys1 = master_keys0 ^ np.array(diff_k, dtype=cipher.word_dtype)[:, np.newaxis]
 
