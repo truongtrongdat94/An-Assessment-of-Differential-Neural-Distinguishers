@@ -220,13 +220,6 @@ def make_train_data_related_key(
 ) -> (np.ndarray, np.ndarray):
     """
     Generates data for the RELATED-KEY differential scenario
-    
-    :param diff_p: The plaintext difference (ΔP)
-    :param diff_k: The key difference (ΔK)
-    
-    Training pairs:
-        - Y=1: (P, P⊕ΔP) encrypted with (K, K⊕ΔK)
-        - Y=0: (P, P_random) encrypted with (K, K⊕ΔK)  ← KEY DIFFERENCE PRESERVED
     """
     # generate labels
     if y is None:
@@ -234,24 +227,40 @@ def make_train_data_related_key(
     elif y == 0 or y == 1:
         y = np.array([y for _ in range(n_samples)], dtype=np.uint8)
     
-    # draw keys and plaintexts
-    keys0 = cipher.draw_keys(n_samples)  # ← K
-    keys1 = keys0 ^ np.array(diff_k, dtype=cipher.word_dtype)[:, np.newaxis]  # ← K' = K ⊕ ΔK
+    # ⭐ CÁCH ĐÚNG: Apply difference ở master key level
+    # Tạm thời bypass key_schedule để lấy master keys
+    original_use_key_schedule = cipher.use_key_schedule
+    cipher.use_key_schedule = False  # Disable để lấy master keys
     
+    # Draw master keys
+    master_keys0 = cipher.draw_keys(n_samples)  # Shape: (n_main_key_words, n_samples)
+    master_keys1 = master_keys0 ^ np.array(diff_k, dtype=cipher.word_dtype)[:, np.newaxis]
+    
+    # Restore setting
+    cipher.use_key_schedule = original_use_key_schedule
+    
+    # Nếu cipher dùng key_schedule, derive round keys từ master keys
+    if cipher.use_key_schedule:
+        keys0 = cipher.key_schedule(master_keys0)
+        keys1 = cipher.key_schedule(master_keys1)
+    else:
+        keys0 = master_keys0
+        keys1 = master_keys1
+    
+    # Draw plaintexts
     pt0 = cipher.draw_plaintexts(n_samples)
     if additional_conditions is not None:
         pt0 = additional_conditions(pt0)
-    pt1 = pt0 ^ np.array(diff_p, dtype=cipher.word_dtype)[:, np.newaxis]  # ← P' = P ⊕ ΔP
+    pt1 = pt0 ^ np.array(diff_p, dtype=cipher.word_dtype)[:, np.newaxis]
     
-    # ✅ CHỈ RANDOMIZE PLAINTEXT CHO LABEL=0, KHÔNG ĐỔI KEY
+    # Randomize pt1 for label=0, GIỮ NGUYÊN key difference
     num_rand_samples = np.sum(y == 0)
-    pt1[:, y == 0] = cipher.draw_plaintexts(num_rand_samples)  # ← RANDOM P' for wrong pairs
-    # ❌ KHÔNG CÓ: keys1[:, y == 0] = ...  (GIỮ NGUYÊN ΔK)
+    pt1[:, y == 0] = cipher.draw_plaintexts(num_rand_samples)
     
-    # encrypt with fixed key difference
-    ct0 = cipher.encrypt(pt0, keys0)  # ← C = E_K(P)
-    ct1 = cipher.encrypt(pt1, keys1)  # ← C' = E_{K⊕ΔK}(P' or P_random)
+    # Encrypt
+    ct0 = cipher.encrypt(pt0, keys0)
+    ct1 = cipher.encrypt(pt1, keys1)
     
-    # perform backwards calculation and other preprocessing
+    # Preprocess
     x = preprocess_samples(ct0, ct1, pt0, pt1, cipher, calc_back, data_format)
     return x, y
