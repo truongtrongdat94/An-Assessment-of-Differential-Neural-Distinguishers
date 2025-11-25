@@ -226,26 +226,21 @@ def make_train_data_related_key(
         y = np.frombuffer(urandom(n_samples), dtype=np.uint8) & 1
     elif y == 0 or y == 1:
         y = np.array([y for _ in range(n_samples)], dtype=np.uint8)
-    
-    # ⭐ CÁCH ĐÚNG: Apply difference ở master key level
-    # Tạm thời bypass key_schedule để lấy master keys
-    original_use_key_schedule = cipher.use_key_schedule
-    cipher.use_key_schedule = False  # Disable để lấy master keys
-    
-    # Draw master keys
-    master_keys0 = cipher.draw_keys(n_samples)  # Shape: (n_main_key_words, n_samples)
+    # Tự generate master keys với shape đúng
+    bytes_per_word = cipher.bytes_per_word(cipher.main_key_word_size)
+    master_keys0 = np.frombuffer(
+        urandom(cipher.n_main_key_words * bytes_per_word * n_samples),
+        dtype=cipher.word_dtype
+    ).reshape(cipher.n_main_key_words, n_samples)  # Shape: (16, n_samples)
+
+    # Áp dụng key difference
     master_keys1 = master_keys0 ^ np.array(diff_k, dtype=cipher.word_dtype)[:, np.newaxis]
-    
-    # Restore setting
-    cipher.use_key_schedule = original_use_key_schedule
-    
-    # Nếu cipher dùng key_schedule, derive round keys từ master keys
-    if cipher.use_key_schedule:
-        keys0 = cipher.key_schedule(master_keys0)
-        keys1 = cipher.key_schedule(master_keys1)
-    else:
-        keys0 = master_keys0
-        keys1 = master_keys1
+
+    # Derive round keys cho TỪNG master key
+    # key_schedule() CÓ THỂ xử lý batch nếu shape đúng (16, n_samples)
+    keys0 = cipher.key_schedule(master_keys0)
+    keys1 = cipher.key_schedule(master_keys1)
+
     
     # Draw plaintexts
     pt0 = cipher.draw_plaintexts(n_samples)
