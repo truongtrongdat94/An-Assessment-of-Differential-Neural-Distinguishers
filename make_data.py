@@ -262,3 +262,93 @@ def make_train_data_related_key(
     # Preprocess
     x = preprocess_samples(ct0, ct1, pt0, pt1, cipher, calc_back, data_format)
     return x, y
+def make_train_data_related_key_modify_input_shape(
+    n_samples, cipher, diff_p, diff_k, calc_back=0, y=None, 
+    additional_conditions=None, data_format=None, shape_input=0
+) -> (np.ndarray, np.ndarray):
+    """
+    :param shape_input: 0 = [ct0_bits | ct1_bits] (default, như ban đầu)
+                        1 = [delta_bits | delta_bits] (mới, từ binary delta)
+    """
+    # Generate labels
+    if y is None:
+        y = np.frombuffer(urandom(n_samples), dtype=np.uint8) & 1
+    elif y == 0 or y == 1:
+        y = np.array([y for _ in range(n_samples)], dtype=np.uint8)
+    
+    # Tạo master keys và apply key difference
+    bytes_per_word = cipher.bytes_per_word(cipher.main_key_word_size)
+    master_keys0 = np.frombuffer(
+        urandom(cipher.n_main_key_words * bytes_per_word * n_samples),
+        dtype=cipher.word_dtype
+    ).reshape(cipher.n_main_key_words, n_samples)
+    
+    if cipher.main_key_word_size < 8:
+        master_keys0 = np.right_shift(master_keys0, 8 - cipher.main_key_word_size)
+    
+    master_keys1 = master_keys0 ^ np.array(diff_k, dtype=cipher.word_dtype)[:, np.newaxis]
+    keys0 = cipher.key_schedule(master_keys0)
+    keys1 = cipher.key_schedule(master_keys1)
+    
+    # Draw plaintexts
+    pt0 = cipher.draw_plaintexts(n_samples)
+    if additional_conditions is not None:
+        pt0 = additional_conditions(pt0)
+    pt1 = pt0 ^ np.array(diff_p, dtype=cipher.word_dtype)[:, np.newaxis]
+    
+    num_rand_samples = np.sum(y == 0)
+    pt1[:, y == 0] = cipher.draw_plaintexts(num_rand_samples)
+    
+    # ENCRYPT - lấy ct0, ct1 gốc
+    ct0 = cipher.encrypt(pt0, keys0)
+    ct1 = cipher.encrypt(pt1, keys1)
+    
+    # ============ TÙY THEO shape_input ============
+    
+    if shape_input == 0:
+        # DEFAULT: X = [ct0_bits | ct1_bits] (như hiện tại)
+        x = preprocess_samples(ct0, ct1, pt0, pt1, cipher, calc_back, data_format)
+        return x, y
+elif shape_input in [1, 2, 3]:
+    # NEW: Tính delta before và after
+    ct0_bits = convert_to_binary(ct0, cipher.get_n_words(), cipher.get_word_size())
+    ct1_bits = convert_to_binary(ct1, cipher.get_n_words(), cipher.get_word_size())
+
+    # Delta TRƯỚC calc_back
+    delta_bits_before = ct0_bits ^ ct1_bits
+
+    # Nếu cần calc_back
+    if calc_back != 0:
+        ct0_back = cipher.calc_back(ct0, pt0, calc_back)
+        ct1_back = cipher.calc_back(ct1, pt1, calc_back)
+        ct0_bits = convert_to_binary(ct0_back, cipher.get_n_words(), cipher.get_word_size())
+        ct1_bits = convert_to_binary(ct1_back, cipher.get_n_words(), cipher.get_word_size())
+        delta_bits_after = ct0_bits ^ ct1_bits
+    else:
+            delta_bits_after = delta_bits_before  # Không calc_back thì giống nhau
+    if shape_input == 1 or shape_input == 2:
+        # Concatenate: (delta_before, delta_after) -> (n_samples, 128) hoặc 192 tùy kích thước
+        x = np.concatenate([delta_bits_before, delta_bits_after], axis=1)
+
+        if shape_input == 2:
+            x = x.reshape(n_samples, 8, 16)
+
+    elif shape_input == 3:
+        # Ở đây giả sử mỗi ct là 64 bit
+        # x: (n_samples, 3, 64) = (delta_after, ct0_back, ct1_back)
+        if calc_back == 0:
+            # Nếu không dùng calc_back, dùng luôn ct0, ct1 gốc
+            ct0_use = ct0_bits
+            ct1_use = ct1_bits
+            delta_use = delta_bits_before
+        else:
+            ct0_use = ct0_bits            # đã là ct0_back_bits
+            ct1_use = ct1_bits            # đã là ct1_back_bits
+            delta_use = delta_bits_after
+
+                x = np.stack([delta_use, ct0_use, ct1_use], axis=1)  # (n_samples, 3, 64)
+
+    return x, y
+
+else:
+    raise ValueError(f"shape_input phải là 0, 1, 2 hoặc 3, không phải {shape_input}")
