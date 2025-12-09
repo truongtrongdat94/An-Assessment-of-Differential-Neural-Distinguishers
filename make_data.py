@@ -340,10 +340,8 @@ elif shape_input in [1, 2]:
             ct1_use = ct1_bits            # đã là ct1_back_bits
             delta_use = delta_bits_after
 
-                x = np.concatenate([delta_use, ct0_use, ct1_use], axis=1)  # (n_samples,192)
+                    x = np.concatenate([delta_use, ct0_use, ct1_use], axis=1)  # (n_samples,192)
 
 
-else:
-    raise ValueError(f"shape_input phải là 0, 1, hoặc 2, không phải {shape_input}")
     
 return x, y
