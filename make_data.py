@@ -308,7 +308,6 @@ def make_train_data_related_key_modify_input_shape(
     if shape_input == 0:
         # DEFAULT: X = [ct0_bits | ct1_bits] (như hiện tại)
         x = preprocess_samples(ct0, ct1, pt0, pt1, cipher, calc_back, data_format)
-        return x, y
 elif shape_input in [1, 2, 3]:
     # NEW: Tính delta before và after
     ct0_bits = convert_to_binary(ct0, cipher.get_n_words(), cipher.get_word_size())
@@ -343,7 +342,8 @@ elif shape_input in [1, 2, 3]:
 
                 x = np.concatenate([delta_use, ct0_use, ct1_use], axis=1)  # (n_samples,192)
 
-    return x, y
 
 else:
     raise ValueError(f"shape_input phải là 0, 1, hoặc 2, không phải {shape_input}")
+    
+return x, y
