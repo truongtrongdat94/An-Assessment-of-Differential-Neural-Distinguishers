@@ -326,16 +326,11 @@ elif shape_input in [1, 2, 3]:
         delta_bits_after = ct0_bits ^ ct1_bits
     else:
             delta_bits_after = delta_bits_before  # Không calc_back thì giống nhau
-    if shape_input == 1 or shape_input == 2:
+    if shape_input == 1:
         # Concatenate: (delta_before, delta_after) -> (n_samples, 128) hoặc 192 tùy kích thước
         x = np.concatenate([delta_bits_before, delta_bits_after], axis=1)
-
-        if shape_input == 2:
-            x = x.reshape(n_samples, 8, 16)
-
-    elif shape_input == 3:
+    elif shape_input == 2:
         # Ở đây giả sử mỗi ct là 64 bit
-        # x: (n_samples, 3, 64) = (delta_after, ct0_back, ct1_back)
         if calc_back == 0:
             # Nếu không dùng calc_back, dùng luôn ct0, ct1 gốc
             ct0_use = ct0_bits
@@ -346,9 +341,9 @@ elif shape_input in [1, 2, 3]:
             ct1_use = ct1_bits            # đã là ct1_back_bits
             delta_use = delta_bits_after
 
-                x = np.stack([delta_use, ct0_use, ct1_use], axis=1)  # (n_samples, 3, 64)
+                x = np.concatenate([delta_use, ct0_use, ct1_use], axis=1)  # (n_samples,192)
 
     return x, y
 
 else:
-    raise ValueError(f"shape_input phải là 0, 1, 2 hoặc 3, không phải {shape_input}")
+    raise ValueError(f"shape_input phải là 0, 1, hoặc 2, không phải {shape_input}")
