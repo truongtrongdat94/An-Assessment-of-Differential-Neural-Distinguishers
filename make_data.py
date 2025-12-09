@@ -305,43 +305,39 @@ def make_train_data_related_key_modify_input_shape(
     
     # ============ TÙY THEO shape_input ============
     
-        if shape_input == 0:
+    if shape_input == 0:
         # DEFAULT: X = [ct0_bits | ct1_bits] (như hiện tại)
         x = preprocess_samples(ct0, ct1, pt0, pt1, cipher, calc_back, data_format)
-elif shape_input in [1, 2]:
+    elif shape_input in [1, 2]:
     # NEW: Tính delta before và after
-    ct0_bits = convert_to_binary(ct0, cipher.get_n_words(), cipher.get_word_size())
-    ct1_bits = convert_to_binary(ct1, cipher.get_n_words(), cipher.get_word_size())
+        ct0_bits = convert_to_binary(ct0, cipher.get_n_words(), cipher.get_word_size())
+        ct1_bits = convert_to_binary(ct1, cipher.get_n_words(), cipher.get_word_size())
 
     # Delta TRƯỚC calc_back
-    delta_bits_before = ct0_bits ^ ct1_bits
+        delta_bits_before = ct0_bits ^ ct1_bits
 
     # Nếu cần calc_back
-    if calc_back != 0:
-        ct0_back = cipher.calc_back(ct0, pt0, calc_back)
-        ct1_back = cipher.calc_back(ct1, pt1, calc_back)
-        ct0_bits = convert_to_binary(ct0_back, cipher.get_n_words(), cipher.get_word_size())
-        ct1_bits = convert_to_binary(ct1_back, cipher.get_n_words(), cipher.get_word_size())
-        delta_bits_after = ct0_bits ^ ct1_bits
-    else:
-            delta_bits_after = delta_bits_before  # Không calc_back thì giống nhau
-    if shape_input == 1:
-        # Concatenate: (delta_before, delta_after) -> (n_samples, 128) hoặc 192 tùy kích thước
-        x = np.concatenate([delta_bits_before, delta_bits_after], axis=1)
-    elif shape_input == 2:
-        # Ở đây giả sử mỗi ct là 64 bit
-        if calc_back == 0:
-            # Nếu không dùng calc_back, dùng luôn ct0, ct1 gốc
-            ct0_use = ct0_bits
-            ct1_use = ct1_bits
-            delta_use = delta_bits_before
+        if calc_back != 0:
+            ct0_back = cipher.calc_back(ct0, pt0, calc_back)
+            ct1_back = cipher.calc_back(ct1, pt1, calc_back)
+            ct0_bits = convert_to_binary(ct0_back, cipher.get_n_words(), cipher.get_word_size())
+            ct1_bits = convert_to_binary(ct1_back, cipher.get_n_words(), cipher.get_word_size())
+            delta_bits_after = ct0_bits ^ ct1_bits
         else:
-            ct0_use = ct0_bits            # đã là ct0_back_bits
-            ct1_use = ct1_bits            # đã là ct1_back_bits
-            delta_use = delta_bits_after
-
-                    x = np.concatenate([delta_use, ct0_use, ct1_use], axis=1)  # (n_samples,192)
-
-
-    
-return x, y
+            delta_bits_after = delta_bits_before  # Không calc_back thì giống nhau
+        if shape_input == 1:
+            # Concatenate: (delta_before, delta_after) -> (n_samples, 128) hoặc 192 tùy kích thước
+            x = np.concatenate([delta_bits_before, delta_bits_after], axis=1)
+        elif shape_input == 2:
+        # Ở đây giả sử mỗi ct là 64 bit
+            if calc_back == 0:
+            # Nếu không dùng calc_back, dùng luôn ct0, ct1 gốc
+                ct0_use = ct0_bits
+                ct1_use = ct1_bits
+                delta_use = delta_bits_before
+            else:
+                ct0_use = ct0_bits            # đã là ct0_back_bits
+                ct1_use = ct1_bits            # đã là ct1_back_bits
+                delta_use = delta_bits_after
+                x = np.concatenate([delta_use, ct0_use, ct1_use], axis=1)  # (n_samples,192)
+    return x, y
