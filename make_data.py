@@ -34,6 +34,29 @@ def convert_to_binary(arr, n_words, word_size) -> np.ndarray:
             x[i] = (arr[index] >> offset) & 1
         x = x.transpose()
         return x
+        
+def convert_to_binary_single(arr, n_words, word_size) -> np.ndarray:
+    """
+    Converts a single ciphertext to an array of bits
+    
+    Args:
+        arr: Single ciphertext array, shape (n_words,)
+        n_words: Number of words
+        word_size: Size of one word (bits)
+    
+    Returns:
+        1D array of bits, shape (n_words * word_size,)
+    """
+    
+    sample_len = n_words * word_size
+    x = np.zeros(sample_len, dtype=np.uint8)
+    
+    for i in range(sample_len):
+        word_idx = i // word_size
+        offset = word_size - (i % word_size) - 1
+        x[i] = (arr[word_idx] >> offset) & 1
+    
+    return x
 
 
 
@@ -323,8 +346,8 @@ def make_train_data_related_key_modify_input_shape(
         x = preprocess_samples(ct0, ct1, pt0, pt1, cipher, calc_back, data_format)
     elif shape_input in [1, 2]:
     # NEW: Tính delta before và after
-        ct0_bits = convert_to_binary(ct0, cipher.get_n_words(), cipher.get_word_size())
-        ct1_bits = convert_to_binary(ct1, cipher.get_n_words(), cipher.get_word_size())
+        ct0_bits = convert_to_binary_single(ct0, cipher.get_n_words(), cipher.get_word_size())
+        ct1_bits = convert_to_binary_single(ct1, cipher.get_n_words(), cipher.get_word_size())
 
     # Delta TRƯỚC calc_back
         delta_bits_before = ct0_bits ^ ct1_bits
@@ -333,8 +356,8 @@ def make_train_data_related_key_modify_input_shape(
         if calc_back != 0:
             ct0_back = cipher.calc_back(ct0, pt0, calc_back)
             ct1_back = cipher.calc_back(ct1, pt1, calc_back)
-            ct0_bits = convert_to_binary(ct0_back, cipher.get_n_words(), cipher.get_word_size())
-            ct1_bits = convert_to_binary(ct1_back, cipher.get_n_words(), cipher.get_word_size())
+            ct0_bits = convert_to_binary_single(ct0_back, cipher.get_n_words(), cipher.get_word_size())
+            ct1_bits = convert_to_binary_single(ct1_back, cipher.get_n_words(), cipher.get_word_size())
             delta_bits_after = ct0_bits ^ ct1_bits
         else:
             delta_bits_after = delta_bits_before  # Không calc_back thì giống nhau
