@@ -36,7 +36,15 @@ def convert_to_binary(arr, n_words, word_size) -> np.ndarray:
         return x
         
 def convert_to_binary_single(arr, n_words, word_size) -> np.ndarray:
-    n_samples = arr.shape[0]
+    """
+    Convert ciphertexts with shape (n_words, n_samples) to binary bits.
+    Input: (n_words, n_samples) from cipher.encrypt() or cipher.draw_plaintexts()
+           Can also be list/tuple from cipher.calc_back()
+    Output: (n_samples, n_words * word_size)
+    """
+    arr = np.asarray(arr, dtype=np.uint32)  # Handle tuple/list from cipher.calc_back()
+    n_words_in = arr.shape[0]  # Should equal n_words parameter
+    n_samples = arr.shape[1]
     sample_len = n_words * word_size
     x = np.zeros((n_samples, sample_len), dtype=np.uint8)
     
@@ -44,9 +52,10 @@ def convert_to_binary_single(arr, n_words, word_size) -> np.ndarray:
         for i in range(sample_len):
             word_idx = i // word_size
             offset = word_size - (i % word_size) - 1
-            x[s, i] = (arr[s, word_idx] >> offset) & 1  
+            x[s, i] = (arr[word_idx, s] >> offset) & 1  # ← KEY FIX: arr[word_idx, s] NOT arr[s, word_idx]
     
     return x  # Output: (n_samples, n_words * word_size)
+
 
 
 
