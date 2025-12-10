@@ -6,22 +6,35 @@ from cipher.speck import Speck
 
 
 def convert_to_binary(arr, n_words, word_size) -> np.ndarray:
-    """
-    Converts a ciphertext pair to an array of bits
-    :param arr: Ciphertext pair
-    :param n_words: Number of word in each ciphertext
-    :param word_size: Size of one word (in bits)
-    :return: 
-    """
-    sample_len = 2 * n_words * word_size
-    n_samples = len(arr[0])
-    x = np.zeros((sample_len, n_samples), dtype=np.uint8)
-    for i in range(sample_len):
-        index = i // word_size
-        offset = word_size - (i % word_size) - 1
-        x[i] = (arr[index] >> offset) & 1
-    x = x.transpose()
-    return x
+    # Auto-detect: single array hay tuple?
+    if isinstance(arr, (list, tuple)):
+        num_ciphertexts = len(arr)
+        n_samples = len(arr[0])
+    else:
+        num_ciphertexts = 1
+        arr = np.array(arr)
+        n_samples = 1
+    
+    sample_len = num_ciphertexts * n_words * word_size
+    
+    if num_ciphertexts == 1:
+        # Single ciphertext: return 1D array
+        x = np.zeros(sample_len, dtype=np.uint8)
+        for i in range(sample_len):
+            word_idx = i // word_size
+            offset = word_size - (i % word_size) - 1
+            x[i] = (arr[word_idx] >> offset) & 1
+        return x
+    else:
+        # Pair of ciphertexts: return 2D array
+        x = np.zeros((sample_len, n_samples), dtype=np.uint8)
+        for i in range(sample_len):
+            index = i // word_size
+            offset = word_size - (i % word_size) - 1
+            x[i] = (arr[index] >> offset) & 1
+        x = x.transpose()
+        return x
+
 
 
 def preprocess_samples(ct0, ct1, pt0, pt1, cipher, calc_back=0, data_format=None) -> np.ndarray:
