@@ -349,8 +349,8 @@ def make_train_data_related_key_modify_input_shape(
             ct0_back = np.array(ct0_back, dtype=cipher.word_dtype)
             ct1_back = np.array(ct1_back, dtype=cipher.word_dtype)
             x = convert_to_binary(np.concatenate((ct0_back, ct1_back), axis=0), cipher.get_n_words(), cipher.get_word_size())
-    else:
-        x = preprocess_samples(ct0, ct1, pt0, pt1, cipher, calc_back, data_format)
+        else:
+            x = preprocess_samples(ct0, ct1, pt0, pt1, cipher, calc_back, data_format)
 
     elif shape_input in [1, 2]:
     # NEW: Tính delta before và after
