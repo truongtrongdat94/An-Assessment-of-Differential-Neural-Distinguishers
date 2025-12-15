@@ -342,8 +342,16 @@ def make_train_data_related_key_modify_input_shape(
     # ============ TÙY THEO shape_input ============
     
     if shape_input == 0:
-        # DEFAULT: X = [ct0_bits | ct1_bits] (như hiện tại)
+        if calc_back != 0:
+            ct0_back = cipher.calc_back(ct0, pt0, calc_back)
+            ct1_back = cipher.calc_back(ct1, pt1, calc_back)
+        if type(ct0_back) is tuple or type(ct0_back) is list:
+            ct0_back = np.array(ct0_back, dtype=cipher.word_dtype)
+            ct1_back = np.array(ct1_back, dtype=cipher.word_dtype)
+            x = convert_to_binary(np.concatenate((ct0_back, ct1_back), axis=0), cipher.get_n_words(), cipher.get_word_size())
+    else:
         x = preprocess_samples(ct0, ct1, pt0, pt1, cipher, calc_back, data_format)
+
     elif shape_input in [1, 2]:
     # NEW: Tính delta before và after
         ct0_bits = convert_to_binary_single(ct0, cipher.get_n_words(), cipher.get_word_size())
