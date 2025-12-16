@@ -344,9 +344,10 @@ def make_train_data_related_key_modify_input_shape(
             ct0_back = cipher.calc_back(ct0, pt0, calc_back)
             ct1_back = cipher.calc_back(ct1, pt1, calc_back)
         if type(ct0_back) is tuple or type(ct0_back) is list:
-            ct0_back = np.array(ct0_back, dtype=cipher.word_dtype)
-            ct1_back = np.array(ct1_back, dtype=cipher.word_dtype)
-            x = convert_to_binary_single(np.concatenate((ct0_back, ct1_back), axis=0), cipher.get_n_words(), cipher.get_word_size())
+            ct0_bits = convert_to_binary_single(ct0_back, cipher.get_n_words(), cipher.get_word_size()) 
+            ct1_bits = convert_to_binary_single(ct1_back, cipher.get_n_words(), cipher.get_word_size())
+            x = np.concatenate([ct0_bits, ct1_bits], axis=1)  
+
         else:
             x = preprocess_samples(ct0, ct1, pt0, pt1, cipher, calc_back, data_format)
 
